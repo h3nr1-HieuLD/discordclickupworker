@@ -1,0 +1,25 @@
+{
+  "name": "discord-clickup-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for ClickUp integration",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "format": "prettier --write '**/*.{ts,js,json}'"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "discord-interactions": "^3.4.0",
+    "itty-router": "^4.0.27"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240320.1",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.2",
+    "wrangler": "^3.37.0"
+  }
+}

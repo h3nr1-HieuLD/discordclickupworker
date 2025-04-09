@@ -1,0 +1,18 @@
+name = "discord-clickup-bot"
+main = "dist/index.js"
+compatibility_date = "2023-05-18"
+
+[build]
+command = "npm run build"
+
+[vars]
+# These are placeholder values that will be replaced by actual values in the Cloudflare dashboard
+# or using wrangler secrets
+DISCORD_PUBLIC_KEY = ""
+DISCORD_APPLICATION_ID = ""
+CLICKUP_WORKSPACE_ID = ""
+
+# Use [vars] for non-secret environment variables
+# Use `wrangler secret put SECRET_NAME` for sensitive environment variables
+# Example: wrangler secret put DISCORD_TOKEN
+# Example: wrangler secret put CLICKUP_API_TOKEN
