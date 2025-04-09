@@ -141,6 +141,7 @@ export async function handleInteraction(interaction: any, env: Env): Promise<Res
           return createDiscordResponse(
             InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
             {
+              content: `✅ Task "${newTask.name}" has been successfully created in ClickUp!`,
               embeds: [
                 formatEmbed(
                   '✅ Task Created',
@@ -149,6 +150,8 @@ export async function handleInteraction(interaction: any, env: Env): Promise<Res
                     { name: 'ID', value: newTask.id },
                     { name: 'List', value: commandOptions.list },
                     { name: 'URL', value: newTask.url || 'N/A' },
+                    { name: 'Status', value: newTask.status?.status || 'New' },
+                    { name: 'Created At', value: new Date().toLocaleString() },
                   ]
                 ),
               ],

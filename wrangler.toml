@@ -16,3 +16,7 @@ CLICKUP_WORKSPACE_ID = "90181041798"
 # Use `wrangler secret put SECRET_NAME` for sensitive environment variables
 # Example: wrangler secret put DISCORD_TOKEN
 # Example: wrangler secret put CLICKUP_API_TOKEN
+
+# wrangler.toml (wrangler v3.88.0^)
+[observability.logs]
+enabled = true
