@@ -43,21 +43,67 @@ export async function handleInteraction(interaction: any, env: Env): Promise<Res
         `CLICKUP_WORKSPACE_ID: ${env.CLICKUP_WORKSPACE_ID ? 'Set' : 'Not set'}`
       );
 
-      // For workspace hierarchy command, let's immediately return a simple response first
-      // to see if basic responses are working
+      // For workspace hierarchy command, fetch the actual hierarchy
       if (name === 'workspace' && commandOptions.subcommand === 'hierarchy') {
-        console.log('DEBUG: Sending immediate simple response for workspace hierarchy');
-        return createDiscordResponse(
-          InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          {
-            content: 'Fetching workspace hierarchy... This is a test response.',
-          }
-        );
+        console.log('DEBUG: Processing workspace hierarchy command');
+
+        try {
+          // First, send a deferred response to avoid timeout
+          const deferredResponse = createDiscordResponse(
+            InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+            {}
+          );
+
+          // Import the getWorkspaceHierarchy function
+          const { getWorkspaceHierarchy } = await import('../clickup/workspace');
+
+          // Get the workspace hierarchy
+          const hierarchy = await getWorkspaceHierarchy(env.CLICKUP_API_TOKEN, env.CLICKUP_WORKSPACE_ID);
+          console.log('DEBUG: Workspace hierarchy fetched successfully');
+
+          // Format the response
+          const spaces = hierarchy.workspace.spaces.map((space: any) => {
+            const lists = space.lists && space.lists.length > 0
+              ? space.lists.map((list: any) => `- ${list.name}`).join('\\n')
+              : 'No lists';
+
+            const folders = space.folders && space.folders.length > 0
+              ? space.folders.map((folder: any) => {
+                  const folderLists = folder.lists && folder.lists.length > 0
+                    ? folder.lists.map((list: any) => `  - ${list.name}`).join('\\n')
+                    : '  - No lists';
+                  return `- 📁 ${folder.name}\\n${folderLists}`;
+                }).join('\\n')
+              : 'No folders';
+
+            return `## 🌐 ${space.name}\\n\\n### Lists:\\n${lists}\\n\\n### Folders:\\n${folders}`;
+          }).join('\\n\\n');
+
+          return createDiscordResponse(
+            InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            {
+              embeds: [
+                formatEmbed(
+                  `${hierarchy.workspace.name || 'ClickUp'} Workspace Hierarchy`,
+                  spaces || 'No spaces found in this workspace'
+                ),
+              ],
+            }
+          );
+        } catch (error) {
+          console.error('DEBUG: Error fetching workspace hierarchy:', error);
+          return createDiscordResponse(
+            InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            {
+              content: `Error fetching workspace hierarchy: ${error instanceof Error ? error.message : String(error)}`,
+            }
+          );
+        }
       }
 
-      // For task create command, also return a simple response
+      // For task create command, create the task and return a response
       if (name === 'task' && commandOptions.subcommand === 'create') {
-        console.log('DEBUG: Sending immediate simple response for task creation');
+        console.log('DEBUG: Processing task creation');
         console.log('DEBUG: Task creation parameters:', JSON.stringify({
           list: commandOptions.list,
           name: commandOptions.name,
@@ -66,43 +112,83 @@ export async function handleInteraction(interaction: any, env: Env): Promise<Res
           due_date: commandOptions.due_date
         }));
 
-        return createDiscordResponse(
-          InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          {
-            content: `Creating task "${commandOptions.name}" in list "${commandOptions.list}"... This is a test response.`,
-          }
-        );
-      }
+        try {
+          // First, send a deferred response to avoid timeout
+          const deferredResponse = createDiscordResponse(
+            InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+            {}
+          );
 
+          // Import the createTask function
+          const { createTask } = await import('../clickup/tasks');
 
+          // Create the task
+          const newTask = await createTask(
+            env.CLICKUP_API_TOKEN,
+            {
+              listName: commandOptions.list,
+              workspaceId: env.CLICKUP_WORKSPACE_ID,
+              name: commandOptions.name,
+              description: commandOptions.description || '',
+              priority: commandOptions.priority,
+              dueDate: commandOptions.due_date,
+            }
+          );
 
-      try {
-        // Handle different commands
-        console.log(`DEBUG: Switching to handler for command: ${name}`);
-        switch (name) {
-        case 'workspace':
-          return handleWorkspaceCommand(commandOptions, env);
+          console.log('DEBUG: Task created successfully:', JSON.stringify(newTask));
 
-        case 'task':
-          return handleTaskCommand(commandOptions, env);
-
-        case 'list':
-          return handleListCommand(commandOptions, env);
-
-        case 'tag':
-          return handleTagCommand(commandOptions, env);
-
-        case 'search':
-          return handleSearchCommand(commandOptions, env);
-
-        default:
+          // Return a response with the task details
           return createDiscordResponse(
             InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
             {
-              content: `Unknown command: ${name}`,
+              embeds: [
+                formatEmbed(
+                  '✅ Task Created',
+                  `Successfully created task "${newTask.name}"`,
+                  [
+                    { name: 'ID', value: newTask.id },
+                    { name: 'List', value: commandOptions.list },
+                    { name: 'URL', value: newTask.url || 'N/A' },
+                  ]
+                ),
+              ],
             }
           );
+        } catch (error) {
+          console.error('DEBUG: Error creating task:', error);
+          return createDiscordResponse(
+            InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            {
+              content: `Error creating task: ${error instanceof Error ? error.message : String(error)}`,
+            }
+          );
+        }
       }
+
+      // For other commands, use the standard handlers
+      if (name !== 'workspace' && name !== 'task') {
+        console.log(`DEBUG: Using standard handler for command: ${name}`);
+        try {
+          // Handle different commands
+          switch (name) {
+            case 'list':
+              return handleListCommand(commandOptions, env);
+
+            case 'tag':
+              return handleTagCommand(commandOptions, env);
+
+            case 'search':
+              return handleSearchCommand(commandOptions, env);
+
+            default:
+              return createDiscordResponse(
+                InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                {
+                  content: `Unknown command: ${name}`,
+                }
+              );
+          }
+        }
     } catch (error) {
       console.error(`Error handling command ${name}:`, error);
       return createDiscordResponse(

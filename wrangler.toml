@@ -8,9 +8,9 @@ command = "npm run build"
 [vars]
 # These are placeholder values that will be replaced by actual values in the Cloudflare dashboard
 # or using wrangler secrets
-DISCORD_PUBLIC_KEY = ""
-DISCORD_APPLICATION_ID = ""
-CLICKUP_WORKSPACE_ID = ""
+DISCORD_PUBLIC_KEY = "3c865188fd357c6653d973bcfa889bbe900230fb5a98488de2930de87b732eb6"
+DISCORD_APPLICATION_ID = "1357672836004712499"
+CLICKUP_WORKSPACE_ID = "90181041798"
 
 # Use [vars] for non-secret environment variables
 # Use `wrangler secret put SECRET_NAME` for sensitive environment variables
