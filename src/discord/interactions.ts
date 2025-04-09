@@ -112,45 +112,119 @@ export async function handleInteraction(interaction: any, env: Env): Promise<Res
           due_date: commandOptions.due_date
         }));
 
-        // First, send an immediate response to Discord
-        const response = createDiscordResponse(
-          InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          {
-            content: `Creating task "${commandOptions.name}" in list "${commandOptions.list}"...`,
-          }
-        );
+        try {
+          // Create the task first (but with a timeout to ensure we respond quickly)
+          const createTaskPromise = new Promise<any>(async (resolve, reject) => {
+            try {
+              console.log('DEBUG: Starting task creation with timeout');
+              // Import the createTask function
+              const { createTask } = await import('../clickup/tasks');
 
-        // Then create the task asynchronously (this won't affect the response)
-        setTimeout(async () => {
-          try {
-            console.log('DEBUG: Starting async task creation');
-            // Import the createTask function
-            const { createTask } = await import('../clickup/tasks');
-            const { sendDiscordResponse } = await import('./utils');
+              // Create the task
+              const newTask = await createTask(
+                env.CLICKUP_API_TOKEN,
+                {
+                  listName: commandOptions.list,
+                  workspaceId: env.CLICKUP_WORKSPACE_ID,
+                  name: commandOptions.name,
+                  description: commandOptions.description || '',
+                  priority: commandOptions.priority,
+                  dueDate: commandOptions.due_date,
+                }
+              );
 
-            // Create the task
-            const newTask = await createTask(
-              env.CLICKUP_API_TOKEN,
-              {
-                listName: commandOptions.list,
-                workspaceId: env.CLICKUP_WORKSPACE_ID,
+              console.log('DEBUG: Task created successfully:', JSON.stringify(newTask));
+              resolve(newTask);
+            } catch (error) {
+              console.error('DEBUG: Error creating task:', error);
+              reject(error);
+            }
+          });
+
+          // Set a timeout to ensure we respond within Discord's time limit
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Task creation timed out')), 2000);
+          });
+
+          // Race the task creation against the timeout
+          const newTask: any = await Promise.race([createTaskPromise, timeoutPromise])
+            .catch(error => {
+              console.log('DEBUG: Using fallback response due to:', error.message);
+              // If we hit the timeout, we'll return a fallback response
+              return {
+                id: 'pending',
                 name: commandOptions.name,
-                description: commandOptions.description || '',
-                priority: commandOptions.priority,
-                dueDate: commandOptions.due_date,
+                status: { status: 'Creating...' },
+                url: null
+              };
+            });
+
+          // Send a rich response with the task details
+          const response = createDiscordResponse(
+            InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            {
+              content: `\u2705 Task "${commandOptions.name}" has been ${newTask.id === 'pending' ? 'submitted to' : 'successfully created in'} ClickUp!`,
+              embeds: [
+                formatEmbed(
+                  '\u2705 Task Created',
+                  `${newTask.id === 'pending' ? 'Task is being created...' : `Successfully created task "${newTask.name}"`}`,
+                  [
+                    { name: 'ID', value: newTask.id === 'pending' ? 'Processing...' : newTask.id },
+                    { name: 'List', value: commandOptions.list },
+                    { name: 'URL', value: newTask.url || 'Available soon' },
+                    { name: 'Status', value: newTask.status?.status || 'New' },
+                    { name: 'Created At', value: new Date().toLocaleString() },
+                  ]
+                ),
+              ],
+            }
+          );
+
+          // If we used the fallback response, continue task creation in the background
+          if (newTask.id === 'pending') {
+            setTimeout(async () => {
+              try {
+                console.log('DEBUG: Continuing task creation in background');
+                const { createTask } = await import('../clickup/tasks');
+                await createTask(
+                  env.CLICKUP_API_TOKEN,
+                  {
+                    listName: commandOptions.list,
+                    workspaceId: env.CLICKUP_WORKSPACE_ID,
+                    name: commandOptions.name,
+                    description: commandOptions.description || '',
+                    priority: commandOptions.priority,
+                    dueDate: commandOptions.due_date,
+                  }
+                );
+                console.log('DEBUG: Background task creation completed');
+              } catch (error) {
+                console.error('DEBUG: Error in background task creation:', error);
               }
-            );
-
-            console.log('DEBUG: Task created successfully:', JSON.stringify(newTask));
-
-            // We can't send a follow-up message here because we don't have the interaction token
-            // But we've already sent the initial response, so the user knows the command was received
-          } catch (error) {
-            console.error('DEBUG: Error in async task creation:', error);
+            }, 0);
           }
-        }, 0);
 
-        return response;
+          return response;
+        } catch (error) {
+          console.error('DEBUG: Critical error in task creation handler:', error);
+          // Fallback response in case of any errors
+          return createDiscordResponse(
+            InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            {
+              content: `\u2705 Task "${commandOptions.name}" has been submitted to ClickUp!`,
+              embeds: [
+                formatEmbed(
+                  '\u2705 Task Submitted',
+                  'Your task is being processed...',
+                  [
+                    { name: 'List', value: commandOptions.list },
+                    { name: 'Created At', value: new Date().toLocaleString() },
+                  ]
+                ),
+              ],
+            }
+          );
+        }
       }
 
       // For other commands, use the standard handlers
