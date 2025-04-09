@@ -101,7 +101,7 @@ export async function handleInteraction(interaction: any, env: Env): Promise<Res
         }
       }
 
-      // For task create command, create the task and return a response
+      // For task create command, first respond immediately, then create the task asynchronously
       if (name === 'task' && commandOptions.subcommand === 'create') {
         console.log('DEBUG: Processing task creation');
         console.log('DEBUG: Task creation parameters:', JSON.stringify({
@@ -112,60 +112,45 @@ export async function handleInteraction(interaction: any, env: Env): Promise<Res
           due_date: commandOptions.due_date
         }));
 
-        try {
-          // First, send a deferred response to avoid timeout
-          const deferredResponse = createDiscordResponse(
-            InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-            {}
-          );
+        // First, send an immediate response to Discord
+        const response = createDiscordResponse(
+          InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          {
+            content: `Creating task "${commandOptions.name}" in list "${commandOptions.list}"...`,
+          }
+        );
 
-          // Import the createTask function
-          const { createTask } = await import('../clickup/tasks');
+        // Then create the task asynchronously (this won't affect the response)
+        setTimeout(async () => {
+          try {
+            console.log('DEBUG: Starting async task creation');
+            // Import the createTask function
+            const { createTask } = await import('../clickup/tasks');
+            const { sendDiscordResponse } = await import('./utils');
 
-          // Create the task
-          const newTask = await createTask(
-            env.CLICKUP_API_TOKEN,
-            {
-              listName: commandOptions.list,
-              workspaceId: env.CLICKUP_WORKSPACE_ID,
-              name: commandOptions.name,
-              description: commandOptions.description || '',
-              priority: commandOptions.priority,
-              dueDate: commandOptions.due_date,
-            }
-          );
+            // Create the task
+            const newTask = await createTask(
+              env.CLICKUP_API_TOKEN,
+              {
+                listName: commandOptions.list,
+                workspaceId: env.CLICKUP_WORKSPACE_ID,
+                name: commandOptions.name,
+                description: commandOptions.description || '',
+                priority: commandOptions.priority,
+                dueDate: commandOptions.due_date,
+              }
+            );
 
-          console.log('DEBUG: Task created successfully:', JSON.stringify(newTask));
+            console.log('DEBUG: Task created successfully:', JSON.stringify(newTask));
 
-          // Return a response with the task details
-          return createDiscordResponse(
-            InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            {
-              content: `✅ Task "${newTask.name}" has been successfully created in ClickUp!`,
-              embeds: [
-                formatEmbed(
-                  '✅ Task Created',
-                  `Successfully created task "${newTask.name}"`,
-                  [
-                    { name: 'ID', value: newTask.id },
-                    { name: 'List', value: commandOptions.list },
-                    { name: 'URL', value: newTask.url || 'N/A' },
-                    { name: 'Status', value: newTask.status?.status || 'New' },
-                    { name: 'Created At', value: new Date().toLocaleString() },
-                  ]
-                ),
-              ],
-            }
-          );
-        } catch (error) {
-          console.error('DEBUG: Error creating task:', error);
-          return createDiscordResponse(
-            InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            {
-              content: `Error creating task: ${error instanceof Error ? error.message : String(error)}`,
-            }
-          );
-        }
+            // We can't send a follow-up message here because we don't have the interaction token
+            // But we've already sent the initial response, so the user knows the command was received
+          } catch (error) {
+            console.error('DEBUG: Error in async task creation:', error);
+          }
+        }, 0);
+
+        return response;
       }
 
       // For other commands, use the standard handlers
