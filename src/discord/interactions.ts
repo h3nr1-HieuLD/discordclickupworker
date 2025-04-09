@@ -188,16 +188,16 @@ export async function handleInteraction(interaction: any, env: Env): Promise<Res
                 }
               );
           }
+        } catch (error) {
+          console.error(`Error handling command ${name}:`, error);
+          return createDiscordResponse(
+            InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            {
+              content: `Error executing command: ${error instanceof Error ? error.message : String(error)}`,
+            }
+          );
         }
-    } catch (error) {
-      console.error(`Error handling command ${name}:`, error);
-      return createDiscordResponse(
-        InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        {
-          content: `Error executing command: ${error instanceof Error ? error.message : String(error)}`,
-        }
-      );
-    }
+      }
   }
 
   // Handle other interaction types
