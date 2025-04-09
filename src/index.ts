@@ -42,6 +42,36 @@ router.get('/test-discord-response', async (_request, env) => {
   }
 });
 
+// Test endpoint for task creation
+router.get('/test-task-create', async (_request, env) => {
+  try {
+    console.log('DEBUG: Testing task creation');
+
+    // Import the necessary functions
+    const { createTask } = await import('./clickup/tasks');
+
+    // Create a test task
+    const task = await createTask(
+      env.CLICKUP_API_TOKEN,
+      {
+        listName: 'Today\'s Tasks',
+        workspaceId: env.CLICKUP_WORKSPACE_ID,
+        name: 'Test Task from API',
+        description: 'This is a test task created via the API',
+        dueDate: 'today',
+      }
+    );
+
+    console.log('DEBUG: Task created successfully:', JSON.stringify(task));
+    return new Response(JSON.stringify(task, null, 2), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('DEBUG: Error in task creation test endpoint:', error);
+    return new Response(`Error creating test task: ${error instanceof Error ? error.message : String(error)}`, { status: 500 });
+  }
+});
+
 // Handle Discord interactions
 router.post('/interactions', async (request, env) => {
   console.log('Received request to /interactions endpoint');

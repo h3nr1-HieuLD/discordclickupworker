@@ -55,6 +55,27 @@ export async function handleInteraction(interaction: any, env: Env): Promise<Res
         );
       }
 
+      // For task create command, also return a simple response
+      if (name === 'task' && commandOptions.subcommand === 'create') {
+        console.log('DEBUG: Sending immediate simple response for task creation');
+        console.log('DEBUG: Task creation parameters:', JSON.stringify({
+          list: commandOptions.list,
+          name: commandOptions.name,
+          description: commandOptions.description,
+          priority: commandOptions.priority,
+          due_date: commandOptions.due_date
+        }));
+
+        return createDiscordResponse(
+          InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          {
+            content: `Creating task "${commandOptions.name}" in list "${commandOptions.list}"... This is a test response.`,
+          }
+        );
+      }
+
+
+
       try {
         // Handle different commands
         console.log(`DEBUG: Switching to handler for command: ${name}`);
